@@ -4,10 +4,8 @@ using System.Collections.Generic;
 using System.IO;
 using UnityEngine;
 
-public class CharacterMovement : MonoBehaviour
+public class CharacterMovement : MonoSingleton<CharacterMovement>
 {
-    public static event Action OnFinish;
-    public static CharacterMovement instance;
     public enum State
     {
         Stand,
@@ -26,7 +24,7 @@ public class CharacterMovement : MonoBehaviour
     private Animator animator;
     private Rigidbody rb;
 
-    public ParticleSystem bounceVfx, macigVfx;
+    public GameObject bounceVfx, macigVfx;
     public GameObject[] items;
 
     //Save Load
@@ -35,11 +33,8 @@ public class CharacterMovement : MonoBehaviour
 
     private void Awake()
     {
-        instance = this;
         animator = GetComponent<Animator>();
         rb = GetComponent<Rigidbody>();
-
-        PoolSystem.Instance.InitPool(bounceVfx, 3);
 
         LoadGame();
     }
@@ -53,7 +48,7 @@ public class CharacterMovement : MonoBehaviour
 
             Debug.Log("Jarvis: Save Folder Created");
         }
-        SetItemObject(saveData.itemNo);
+        SetItem(saveData.itemNo);
     }
 
     private void Update()
@@ -80,17 +75,9 @@ public class CharacterMovement : MonoBehaviour
                 {
                     moveFactorZ = 0;
                 }
-
-                //rb.MovePosition( new Vector3( //Dont Smooth
-                //        transform.position.x + forwardSpeed * Time.deltaTime,
-                //        rb.velocity.y, Mathf.Lerp(transform.position.z,
-                //        transform.position.z - moveFactorZ * swerveSpeed,
-                //        Time.deltaTime)));
-
                 rb.AddForce(transform.right * moveFactorZ * Time.deltaTime * sensitivity * 300, ForceMode.Acceleration);
 
                 transform.rotation = Quaternion.Euler(0, 90, 0);
-                //transform.rotation = Quaternion.Lerp(transform.rotation, Quaternion.Euler(0, 90 + moveFactorZ, 0), 2f * Time.deltaTime);
 
                 if (rb.velocity.x < 8)
                 {
@@ -111,9 +98,9 @@ public class CharacterMovement : MonoBehaviour
         rb.velocity = Vector3.zero;
         rb.isKinematic = true;
         animator.SetInteger("Case", 0);
-        macigVfx.gameObject.SetActive(false);
+        macigVfx.SetActive(false);
         transform.position = new Vector3(-10, 0.15f, 0);
-        GameSystem.SetCamera();
+        GameSystem.SetCamera(true);
     }
     public void Run()
     {
@@ -125,11 +112,14 @@ public class CharacterMovement : MonoBehaviour
     public void StartPaint()
     {
         state = State.Painting;
-        AudioManager.PlaySound(3);
-        macigVfx.gameObject.SetActive(true);
+        AudioManager.Instance.PlayMonoSound(3);
+        macigVfx.SetActive(true);
         animator.SetInteger("Case", 2);
         rb.velocity = Vector3.zero;
-        OnFinish.Invoke();
+
+        UiManager.Instance.eventList.onFinish.gameEvent.Invoke();
+        GameSystem.Instance.OnFinish();
+        Wall.instance.ActivePaint();
     }
 
     private void OnCollisionEnter(Collision collision)
@@ -138,28 +128,22 @@ public class CharacterMovement : MonoBehaviour
         {
             case "Destroyer":
                 rb.velocity = Vector3.zero;
-                GameSystem.Reposition(gameObject);
-                AudioManager.PlaySound(1);
+                GameSystem.Instance.Reposition(gameObject);
+                AudioManager.Instance.PlayMonoSound(1);
                 break;
             case "Bounce":
                 //rb.velocity = Vector3.zero;
                 rb.AddExplosionForce(bounceForce, collision.contacts[0].point, 1);
-                AudioManager.PlaySound(0);
+                AudioManager.Instance.PlayMonoSound(0);
 
-                var vfx = PoolSystem.Instance.GetInstance<ParticleSystem>(bounceVfx);
-                vfx.time = 0.0f;
-                vfx.Play();
-                vfx.transform.position = transform.position;
+                PoolSystem.Instance.SpawnObject(bounceVfx, transform.position, 3f);
                 break;
             case "Ai":
                 rb.velocity = Vector3.zero;
                 rb.AddExplosionForce(bounceForce / 10, collision.contacts[0].point, 1);
-                AudioManager.PlaySound(0);
+                AudioManager.Instance.PlayMonoSound(0);
 
-                var aVfx = PoolSystem.Instance.GetInstance<ParticleSystem>(bounceVfx);
-                aVfx.time = 0.0f;
-                aVfx.Play();
-                aVfx.transform.position = transform.position;
+                PoolSystem.Instance.SpawnObject(bounceVfx, transform.position, 3f);
                 break;
             case "Finish":
                 collision.gameObject.SetActive(false);
@@ -186,8 +170,7 @@ public class CharacterMovement : MonoBehaviour
                 rb.AddForce(transform.right * -30, ForceMode.Acceleration);
         }
     }
-    public static void SetItem(int index) => instance.SetItemObject(index);
-    public void SetItemObject(int index)
+    public void SetItem(int index)
     {
         for (int i = 0; i < items.Length; i++)
         {

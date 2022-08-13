@@ -3,23 +3,21 @@ using System.Collections.Generic;
 using UnityEngine;
 using Object = UnityEngine.Object;
 
-public class PoolSystem : MonoBehaviour
+public class PoolSystem : MonoSingleton<PoolSystem>
 {
-    public static PoolSystem Instance { get; private set; }
+    Dictionary<Object, Queue<Object>> pools = new Dictionary<Object, Queue<Object>>();
 
     public static void Create(Transform parent)
     {
         GameObject obj = new GameObject("PoolSystem");
         obj.transform.parent = parent;
-        Instance = obj.AddComponent<PoolSystem>();
+        obj.AddComponent<PoolSystem>();
     }
 
-    Dictionary<Object, Queue<Object>> m_Pools = new Dictionary<Object, Queue<Object>>();
-    Queue<Object> output = new Queue<Object>();
-
-    public void InitPool(UnityEngine.Object prefab, int size)
+    public void CreateObject(UnityEngine.Object prefab) => CreateObject(prefab, 1);
+    public void CreateObject(UnityEngine.Object prefab, int size)
     {
-        if (m_Pools.ContainsKey(prefab))
+        if (pools.ContainsKey(prefab))
             return;
 
         Queue<Object> queue = new Queue<Object>();
@@ -31,13 +29,13 @@ public class PoolSystem : MonoBehaviour
             queue.Enqueue(o);
         }
 
-        m_Pools[prefab] = queue;
+        pools[prefab] = queue;
     }
 
-    public T GetInstance<T>(Object prefab) where T : Object
+    public T GetObject<T>(Object prefab) where T : Object
     {
         Queue<Object> queue;
-        if (m_Pools.TryGetValue(prefab, out queue))
+        if (pools.TryGetValue(prefab, out queue))
         {
             Object obj;
 
@@ -51,14 +49,13 @@ public class PoolSystem : MonoBehaviour
             }
 
             SetActive(obj, true);
-            queue.Enqueue(obj);
-
-            output.Enqueue(obj);
             return obj as T;
         }
-
-        UnityEngine.Debug.LogError("No pool was init with this prefab");
-        return null;
+        else
+        {
+            CreateObject(prefab);
+            return GetObject<T>(prefab);
+        }
     }
 
     static void SetActive(Object obj, bool active)
@@ -77,11 +74,28 @@ public class PoolSystem : MonoBehaviour
         go.SetActive(active);
     }
 
-    public void ResetPool()
+    public void HideObject<T>(Object objectPrefab, Object currentObject) where T : Object
     {
-        while (output.Count > 0)
+        Queue<Object> queue;
+        if (pools.TryGetValue(objectPrefab, out queue))
         {
-            SetActive(output.Dequeue(), false);
+            SetActive(currentObject, false);
+            queue.Enqueue(currentObject);
         }
+        else
+        {
+            Debug.LogError("No pool was init with this prefab !!!");
+        }
+    }
+
+    public void SpawnObject(GameObject prefab, Vector3 position) => StartCoroutine(SpawnNewObject(prefab, position, 0)); 
+    public void SpawnObject(GameObject prefab, Vector3 position, float duration) => StartCoroutine(SpawnNewObject(prefab, position, duration));
+    private IEnumerator SpawnNewObject(GameObject prefab, Vector3 position, float duration)
+    {
+        GameObject newObject = GetObject<GameObject>(prefab);
+        newObject.transform.position = position;
+        if (duration <= 0) yield break;
+        yield return new WaitForSeconds(duration);
+        HideObject<GameObject>(prefab, newObject);
     }
 }

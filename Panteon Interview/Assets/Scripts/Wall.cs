@@ -3,8 +3,21 @@ using System.Collections.Generic;
 using UnityEngine;
 using System;
 
-public class Wall : MonoBehaviour
+public class Wall : MonoSingleton<Wall>
 {
+    [System.Serializable]
+    public class PaintVertex
+    {
+        public Vector3 vertexPos;
+        public bool painted;
+        public PaintVertex(Vector3 vertexPos, bool painted)
+        {
+            this.vertexPos = vertexPos;
+            this.painted = painted;
+        }
+        public PaintVertex() { }
+    }
+
     public static Wall instance;
     public static event Action<float> OnPaintVertex; //her vertex boyandýðýnda ui ý uyarýr
     public static event Action OnPainted; //%100 boyanýnca
@@ -17,9 +30,10 @@ public class Wall : MonoBehaviour
     public Vector2Int textureArea; //kordinatlar, !! yüzde hesaplamak için sonradan calass içerisinde kullan
     Texture2D texture;
     [Header("Percent Dataset")]
-    [SerializeField] private List<PaintVertex> verticesData; //vertekslerin datasý
-    public float paintedPercent; //boyanan yüzde
-    public GameObject paintedPointPref;
+    private List<PaintVertex> verticesData; //vertekslerin datasý
+    private float paintedPercent; //boyanan yüzde
+    public GameObject visualPrefab;
+    List<GameObject> visualList = new List<GameObject>();
 
     private void Awake()
     {
@@ -32,7 +46,18 @@ public class Wall : MonoBehaviour
         CreateVerticesData();
         ResetWall();
         isRun = false;
-        CharacterMovement.OnFinish += ActivePaint;
+    }
+    private void Update()
+    {
+        if (Input.GetMouseButton(0) && isRun)
+        {
+            RaycastHit hit;
+            if (Physics.Raycast(cam.ScreenPointToRay(Input.mousePosition), out hit)) //sadece duvarda çalýþtýr (performans)
+            {
+                SetVerticesPosition(hit.point);
+                Paint(hit.textureCoord);
+            }
+        }
     }
 
     public void CreateVerticesData()
@@ -46,7 +71,6 @@ public class Wall : MonoBehaviour
             //verticesData.Add(new PaintVertex(localToWorld.MultiplyPoint3x4(vertex), false)); //PATLIYOR, sorunu tespit et !!!
         }
         paintedPercent = 0;
-        PoolSystem.Instance.InitPool(paintedPointPref, verticesData.Count);
     }
 
     public void SetVerticesPosition(Vector3 brushPosition)
@@ -55,11 +79,10 @@ public class Wall : MonoBehaviour
         {
             if (!vertex.painted && 0.5f >= Vector3.Distance(vertex.vertexPos, brushPosition))
             {
-                GameObject pointObj = PoolSystem.Instance.GetInstance<GameObject>(paintedPointPref);
-                pointObj.transform.position = vertex.vertexPos;
+                AddVisualObjects(vertex.vertexPos);
 
                 paintedPercent += 100f / verticesData.Count;
-                AudioManager.PlaySound(2);
+                AudioManager.Instance.PlayMonoSound(2);
                 vertex.painted = true;
 
                 OnPaintVertex.Invoke(paintedPercent);
@@ -67,20 +90,26 @@ public class Wall : MonoBehaviour
                 if (paintedPercent >= 100)
                 {
                     isRun = false;
-                    OnPainted.Invoke();
+                    AudioManager.Instance.PlayMonoSound(4);
+                    UiManager.Instance.eventList.onWin.gameEvent.Invoke();
                 }
             }
         }
+    }
+    public void AddVisualObjects(Vector3 position)
+    {
+        GameObject obj = PoolSystem.Instance.GetObject<GameObject>(visualPrefab);
+        obj.transform.position = position;
+        visualList.Add(obj);
     }
 
     public void ActivePaint() { isRun = true; }
 
     //birden fazla class olabilir static ile çalýþtýrma evente abone et
 
-    public static void ResetPaintableWall() => instance.ResetWall();
-
     public void ResetWall()
     {
+        ClearVisualObjects();
         //material - texture
         texture = new Texture2D(textureArea.x, textureArea.y, TextureFormat.ARGB32, false); //create
         meshRenderer.material.mainTexture = texture; //add
@@ -92,21 +121,14 @@ public class Wall : MonoBehaviour
         }
     }
 
-    private void Update()
+    public void ClearVisualObjects()
     {
-        if (Input.GetMouseButton(0) && isRun)
+        foreach (var obj in visualList)
         {
-            RaycastHit hit;
-            if (Physics.Raycast(cam.ScreenPointToRay(Input.mousePosition), out hit)) //sadece duvarda çalýþtýr (performans)
-            {
-                SetVerticesPosition(hit.point);
-                //Debug.Log(hit.point);
-                //Debug.Log(hitInfo.textureCoord);
-                Paint(hit.textureCoord);
-            }
+           PoolSystem.Instance.HideObject<GameObject>(visualPrefab, obj);
         }
+        visualList.Clear();
     }
-
     private void Paint(Vector2 cordinate)
     {
         cordinate.x *= texture.width; //0 - 1024
@@ -130,40 +152,11 @@ public class Wall : MonoBehaviour
                 {
                     int tPos = xPos + (texture.width * yPos);
                     textureC32[tPos] = brushC32[x + (y * brush.width)];
-
-                    //if (brushC32[x + (y * brush.width)].r < textureC32[tPos].r)
-                    //{
-                    //    textureC32[tPos] = brushC32[x + (y * brush.width)];
-                    //}
                 }
-                //if (brush.GetPixel(x,y).a > 0f)
-                //{
-                //    texture.SetPixel(
-                //        (int)cordinate.x + (halfbrush.x - x),
-                //        (int)cordinate.y + (halfbrush.y - y),
-                //        brush.GetPixel(x, y)
-                //        );
-                //}
             }
         }
 
         texture.SetPixels32(textureC32);
         texture.Apply();
-    }
-}
-
-[System.Serializable]
-public class PaintVertex
-{
-    public Vector3 vertexPos;
-    public bool painted;
-    public PaintVertex(Vector3 vertexPos, bool painted)
-    {
-        this.vertexPos = vertexPos;
-        this.painted = painted;
-    }
-    public PaintVertex()
-    {
-
     }
 }

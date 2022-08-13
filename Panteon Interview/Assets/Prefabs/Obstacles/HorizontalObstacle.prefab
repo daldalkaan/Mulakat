@@ -110,6 +110,5 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   obstaclesType: 1
-  deltaRot: {x: 0, y: 0, z: 0}
-  speed: 5
-  distance: 7
+  movementVector: {x: 0, y: 0, z: 14}
+  period: 5

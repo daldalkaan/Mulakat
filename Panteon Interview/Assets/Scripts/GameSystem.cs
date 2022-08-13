@@ -4,48 +4,33 @@ using UnityEngine;
 using System;
 using UnityEngine.AI;
 
-public class GameSystem : MonoBehaviour
+public class GameSystem : MonoSingleton<GameSystem>
 {
-    public static event Action<string[]> playerSort;
-
-    public static GameSystem instance { get; private set; }
-    CharacterMovement characterMovement;
-    UiManager uiManager;
-
     bool run;
 
     public GameObject FinishObstacle;
-    public int aiCount = 10;
-    [Header("")]
-    public Vector3 spawnPoint;
-    public Vector3 finishPoint;
-    [Header("")]
-    public Vector3 paintCamPos;
-    public Vector3 paintCamRot;
-    [Header("")]
-    public GameObject[] aiPrefabs;
-    public List<aiData> aiDataset;
-    public string[] names;
+    public GameData data;
 
+    List<aiData> aiDataset;
     NavMeshSurface surface;
 
     private void Awake()
     {
-        instance = this;
         PoolSystem.Create(transform);
 
-        if (aiPrefabs.Length > 0)
+        aiDataset = new List<aiData>();
+        if (data.aiPrefabs.Length > 0)
         {
-            if (aiCount % 2 != 0) { aiCount += 1; Debug.LogError("Admin: Ai count odd number !"); }
+            if (data.aiCount % 2 != 0) { data.aiCount += 1; Debug.LogError("Admin: Ai count odd number !"); }
 
-            playerList = new string[aiCount + 1];
-            for (int z = 0; z < aiCount / 2; z++)
+            playerList = new string[data.aiCount + 1];
+            for (int z = 0; z < data.aiCount / 2; z++)
             {
                 for (int x = 0; x < 2; x++)
                 {
-                    Ai newAi = Instantiate(aiPrefabs[x]).GetComponent<Ai>();
+                    Ai newAi = Instantiate(data.aiPrefabs[x]).GetComponent<Ai>();
                     aiDataset.Add(new aiData(newAi, GetName()));
-                    newAi.transform.position = spawnPoint + new Vector3(x * 3, 0, z * 3);
+                    newAi.transform.position = data.spawnPoint + new Vector3(x * 3, 0, z * 3);
                     newAi.CrateAvatar(z, x);
                     newAi.gameObject.SetActive(false);
                     playerList[(z * 2) + x] = aiDataset[(z * 2) + x].name;
@@ -59,15 +44,7 @@ public class GameSystem : MonoBehaviour
 
     private void Start()
     {
-        if (CharacterMovement.instance != null)
-        {
-            characterMovement = CharacterMovement.instance.GetComponent<CharacterMovement>();
-            uiManager = UiManager.instance.GetComponent<UiManager>();
-            uiManager.StandMenu();
-        }
-        Wall.OnPainted += Win;
-        CharacterMovement.OnFinish += OnFinish;
-
+        UiManager.Instance.eventList.onStand.gameEvent.Invoke();
         StartCoroutine(RunLongUpdate());
     }
 
@@ -75,7 +52,7 @@ public class GameSystem : MonoBehaviour
     {
         while (true)
         {
-            yield return new WaitForSeconds(3);
+            yield return new WaitForSeconds(1);
             LongUpdate();
         }
     }
@@ -104,7 +81,7 @@ public class GameSystem : MonoBehaviour
                     }
                 }
             }
-            if (aiDataset[a].ai.transform.position.x < characterMovement.transform.position.x)
+            if (aiDataset[a].ai.transform.position.x < CharacterMovement.Instance.transform.position.x)
             {
                 no++;
             }
@@ -113,18 +90,18 @@ public class GameSystem : MonoBehaviour
         no = 0;
         for (int a = 0; a < aiDataset.Count; a++)
         {
-            if (characterMovement.transform.position.x < aiDataset[a].ai.transform.position.x)
+            if (CharacterMovement.Instance.transform.position.x < aiDataset[a].ai.transform.position.x)
             {
                 no++;
             }
         }
         playerList[no] = "You";
-        playerSort.Invoke(playerList);
+        UiManager.Instance.ReadPlayerList(playerList);
     }
 
     public string GetName()
     {
-        string name = names[UnityEngine.Random.Range(0, names.Length)];
+        string name = data.names[UnityEngine.Random.Range(0, data.names.Length)];
         foreach (var ai in aiDataset)
         {
             if (ai.name == name)
@@ -134,23 +111,21 @@ public class GameSystem : MonoBehaviour
         }
         return name;
     }
-    public static void ReadyGame() => instance.Ready();
-    public void Ready()
+    public void ReadyGame()
     {
         Time.timeScale = 1;
-        PoolSystem.Instance.ResetPool();
         FinishObstacle.SetActive(true);
         CheckPlayerList();
-        for (int z = 0; z < aiCount / 2; z++)
+        for (int z = 0; z < data.aiCount / 2; z++)
         {
             for (int x = 0; x < 2; x++)
             {
-                aiDataset[(z * 2) + x].ai.transform.position = spawnPoint + new Vector3(x * 2, 0, z * 2);
+                aiDataset[(z * 2) + x].ai.transform.position = data.spawnPoint + new Vector3(x * 2, 0, z * 2);
                 aiDataset[(z * 2) + x].ai.gameObject.SetActive(true);
                 aiDataset[(z * 2) + x].ai.Ready();
             }
         }
-        characterMovement.Ready();
+        CharacterMovement.Instance.Ready();
         StartCoroutine(Go());
     }
 
@@ -159,17 +134,17 @@ public class GameSystem : MonoBehaviour
         yield return new WaitForSeconds(3);
         run = true;
         Time.timeScale = 1;
-        AudioManager.PlaySound(3);
-        characterMovement.Run();
+        AudioManager.Instance.PlayMonoSound(3);
+        CharacterMovement.Instance.Run();
         foreach (var aiData in aiDataset)
         {
-            aiData.ai.Go(finishPoint);
+            aiData.ai.Go(data.finishPoint);
         }
     }
 
-    public static void Reposition(GameObject character)
+    public void Reposition(GameObject character)
     {
-        character.transform.position = instance.spawnPoint;
+        character.transform.position = data.spawnPoint;
     }
 
     public void OnFinish()
@@ -177,18 +152,12 @@ public class GameSystem : MonoBehaviour
         run = false;
         Time.timeScale = 1;
         HideAllEnemies();
-        LeanTween.move(characterMovement.gameObject, finishPoint, 1);
-        characterMovement.transform.rotation = Quaternion.Euler(0,90,0);
+        LeanTween.move(CharacterMovement.Instance.gameObject, data.finishPoint, 1);
+        CharacterMovement.Instance.transform.rotation = Quaternion.Euler(0,90,0);
 
         Camera.main.GetComponent<Cinemachine.CinemachineBrain>().enabled = false;
-        LeanTween.move(Camera.main.gameObject, paintCamPos, 1);
-        LeanTween.rotate(Camera.main.gameObject, paintCamRot, 1);
-    }
-
-    public void Win()
-    {
-        AudioManager.PlaySound(4);
-        Debug.Log("Win");
+        LeanTween.move(Camera.main.gameObject, data.paintCamPos, 1);
+        LeanTween.rotate(Camera.main.gameObject, data.paintCamRot, 1);
     }
 
     public void HideAllEnemies()
@@ -199,15 +168,13 @@ public class GameSystem : MonoBehaviour
             aiData.ai.gameObject.SetActive(false);
         }
     }
-    public static void SetCamera() { Camera.main.GetComponent<Cinemachine.CinemachineBrain>().enabled = true; }
+    public static void SetCamera(bool value) { Camera.main.GetComponent<Cinemachine.CinemachineBrain>().enabled = value; }
 
-    public static void Lose() => instance.LoseGame();
     public void LoseGame()
     {
         HideAllEnemies();
-        uiManager.SetTryAgainPanel("YOU LOSE");
-        AudioManager.PlaySound(5);
-
+        UiManager.Instance.eventList.onLose.gameEvent.Invoke();
+        AudioManager.Instance.PlayMonoSound(5);
         Time.timeScale = 0;
     }
 }

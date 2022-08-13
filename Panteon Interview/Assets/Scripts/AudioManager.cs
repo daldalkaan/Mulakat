@@ -3,10 +3,8 @@ using System.Collections.Generic;
 using UnityEngine.Audio;
 using UnityEngine;
 
-public class AudioManager : MonoBehaviour
+public class AudioManager : MonoSingleton<AudioManager>
 {
-    public static AudioManager instance;
-
     //public AudioMixerGroup uiMixer, sfxMixer;
     public AudioClip[] clips;
     public Queue<AudioSource> monoSources;
@@ -14,15 +12,11 @@ public class AudioManager : MonoBehaviour
 
     private void Awake()
     {
-        if (instance==null)
-        {
-            instance = this;
-        }
-        else
-        {
-            Destroy(gameObject);
-        }
+        CreateAudioPools();
+    }
 
+    public void CreateAudioPools()
+    {
         monoSources = new Queue<AudioSource>();
         for (int i = 0; i < 20; i++)
         {
@@ -49,32 +43,31 @@ public class AudioManager : MonoBehaviour
             stereoSources.Enqueue(audioSource);
         }
     }
-    public static void PlaySound(int no) //2D
+
+    public void PlayMonoSound(int no) //2D
     {
         AudioSource audioSource = GetMonoSource();
-        audioSource.clip = instance.clips[no];
+        audioSource.clip = clips[no];
         audioSource.Play();
     }
-
-    public static AudioSource GetMonoSource()
+    public AudioSource GetMonoSource()
     {
-        AudioSource s = instance.monoSources.Dequeue();
-        instance.monoSources.Enqueue(s);
+        AudioSource s = monoSources.Dequeue();
+        monoSources.Enqueue(s);
 
         return s;
     }
-    public static void Play3DSound(int no, Vector3 position) //3D
+    public void PlayStereoSound(int no, Vector3 position) //3D
     {
         AudioSource audioSource = GetStereoSource();
         audioSource.transform.position = position;
-        audioSource.clip = instance.clips[no];
+        audioSource.clip = clips[no];
         audioSource.Play();
     }
-
-    public static AudioSource GetStereoSource()
+    public AudioSource GetStereoSource()
     {
-        AudioSource s = instance.stereoSources.Dequeue();
-        instance.stereoSources.Enqueue(s);
+        AudioSource s = stereoSources.Dequeue();
+        stereoSources.Enqueue(s);
 
         return s;
     }

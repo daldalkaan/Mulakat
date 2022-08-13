@@ -827,7 +827,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   state: 0
   mat: {fileID: 2100000, guid: 7976914b70de04e42a17b1c5aa119ab3, type: 2}
-  bounceVfx: {fileID: 3781955724047737451, guid: 36313f82ad4150c40b8f76d5780cb703, type: 3}
+  bounceVfx: {fileID: 3943736549030267685, guid: 36313f82ad4150c40b8f76d5780cb703, type: 3}
 --- !u!195 &7699871915817107215
 NavMeshAgent:
   m_ObjectHideFlags: 0

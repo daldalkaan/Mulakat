@@ -18,7 +18,7 @@ public class Ai : MonoBehaviour
 
     public State state;
     public Material mat;
-    public ParticleSystem bounceVfx;
+    public GameObject bounceVfx;
 
     private IEnumerator corountine;
     private Vector3 destination;
@@ -30,8 +30,6 @@ public class Ai : MonoBehaviour
         mat = Instantiate(mat);
         mat.mainTextureOffset = new Vector2(0.7f + (x / 10), (y / 20));
         mesh.material = mat;
-
-        PoolSystem.Instance.InitPool(bounceVfx, 3);
 
         agent = GetComponent<NavMeshAgent>();
         animator = GetComponent<Animator>();
@@ -75,18 +73,15 @@ public class Ai : MonoBehaviour
                         corountine = null;
                     }
                     rb.velocity = Vector3.zero;
-                    GameSystem.Reposition(gameObject);
-                    AudioManager.Play3DSound(1, transform.position);
+                    GameSystem.Instance.Reposition(gameObject);
+                    AudioManager.Instance.PlayStereoSound(1, transform.position);
                     SetActivePhysic(false);
                     break;
                 case "Bounce":
                     if (agent.enabled)
                     {
-                        var bVfx = PoolSystem.Instance.GetInstance<ParticleSystem>(bounceVfx);
-                        bVfx.time = 0.0f;
-                        bVfx.Play();
-                        bVfx.transform.position = transform.position + new Vector3(0.71f, 0, 0);
-                        AudioManager.Play3DSound(0, transform.position);
+                        PoolSystem.Instance.SpawnObject(bounceVfx, transform.position + new Vector3(0.71f, 0, 0), 3f);
+                        AudioManager.Instance.PlayStereoSound(0, transform.position);
                     }
                     SetActivePhysic(true);
                     RaycastHit hit;
@@ -121,11 +116,8 @@ public class Ai : MonoBehaviour
                     if (collision.gameObject == gameObject) { return; }
                     if (agent.enabled)
                     {
-                        var aVfx = PoolSystem.Instance.GetInstance<ParticleSystem>(bounceVfx);
-                        aVfx.time = 0.0f;
-                        aVfx.Play();
-                        aVfx.transform.position = transform.position;
-                        AudioManager.Play3DSound(0, transform.position);
+                        PoolSystem.Instance.SpawnObject(bounceVfx, transform.position, 3f);
+                        AudioManager.Instance.PlayStereoSound(0, transform.position);
                     }
                     SetActivePhysic(true);
                     CheckGround();
@@ -137,7 +129,7 @@ public class Ai : MonoBehaviour
                     break;
                 case "Finish":
                     collision.gameObject.SetActive(false);
-                    GameSystem.Lose();
+                    GameSystem.Instance.LoseGame();
                     break;
                 default:
                     break;

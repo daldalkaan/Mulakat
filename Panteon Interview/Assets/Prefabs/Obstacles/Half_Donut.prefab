@@ -224,9 +224,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   obstaclesType: 0
-  deltaRot: {x: 0.1, y: 0, z: 0}
-  speed: 0
-  distance: 0
+  movementVector: {x: -0.2, y: 0, z: 0}
+  period: 0
 --- !u!1 &5511200809101773257
 GameObject:
   m_ObjectHideFlags: 0
